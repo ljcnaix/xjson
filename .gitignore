@@ -1,0 +1,14 @@
+# Object files
+*.o
+
+# Libraries
+*.a
+
+# Shared objects
+*.so
+
+# Executables
+*.out
+
+# CMake directory
+build/
