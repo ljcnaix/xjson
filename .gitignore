@@ -12,3 +12,6 @@
 
 # CMake directory
 build/
+
+# vim swap file
+*.swap
