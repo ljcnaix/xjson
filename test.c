@@ -26,33 +26,50 @@ static int test_pass = 0;
 #define EXPECT_EQ_DOUBLE(expect, actual) EXPECT_EQ_BASE((expect) == (actual),\
                 expect, actual, "%.17g")
 
+#define EXPECT_EQ_STRING(expect, actual, _length)\
+                EXPECT_EQ_BASE(\
+                        sizeof(expect) - 1 == _length &&\
+                        memcmp(expect, actual, _length) == 0,\
+                        expect, actual, "%s")
+
+#define EXPECT_TRUE(actual) EXPECT_EQ_BASE((actual) != 0, "true", "false", "%s")
+#define EXPECT_TRUE(actual) EXPECT_EQ_BASE((actual) == 0, "false", "true", "%s")
+
 static void test_parse_null() {
         xjson_value v;
-        v.type = XJSON_FALSE;
+        xjson_init(&v);
+        xjson_set_boolean(&v, xjson_false);
         EXPECT_EQ_INT(XJSON_PARSE_OK, xjson_parse(&v, "null"));
         EXPECT_EQ_INT(XJSON_NULL, xjson_get_type(&v));
+        xjson_free(&v);
 }
 
 static void test_parse_true() {
         xjson_value v;
-        v.type = XJSON_NULL;
+        xjson_init(&v);
+        xjson_set_boolean(&v, xjson_false);
         EXPECT_EQ_INT(XJSON_PARSE_OK, xjson_parse(&v, "true"));
         EXPECT_EQ_INT(XJSON_TRUE, xjson_get_type(&v));
+        xjson_free(&v);
 }
 
 static void test_parse_false() {
         xjson_value v;
-        v.type = XJSON_NULL;
+        xjson_init(&v);
+        xjson_set_boolean(&v, xjson_true);
         EXPECT_EQ_INT(XJSON_PARSE_OK, xjson_parse(&v, "false"));
         EXPECT_EQ_INT(XJSON_FALSE, xjson_get_type(&v));
+        xjson_free(&v);
 }
 
 #define TEST_NUMBER(expect, json)\
         do {\
                 xjson_value v;\
+                xjson_init(&v);\
                 EXPECT_EQ_INT(XJSON_PARSE_OK, xjson_parse(&v, json));\
                 EXPECT_EQ_INT(XJSON_NUMBER, xjson_get_type(&v));\
                 EXPECT_EQ_DOUBLE(expect, xjson_get_number(&v));\
+                xjson_free(&v);\
         } while(0)
 
 static void test_parse_number() {
@@ -103,12 +120,29 @@ static void test_parse_number() {
         TEST_NUMBER(-1.7976931348623157e+308, "-1.7976931348623157e+308");
 }
 
+#define TEST_STRING(expect, json)\
+        do {\
+                xjson_value v;\
+                xjson_init(&v);\
+                EXPECT_EQ_INT(XJSON_PARSE_OK, xjson_parse(&v, json));\
+                EXPECT_EQ_INT(XJSON_STRING, xjson_get_type(&v));\
+                EXPECT_EQ_STRING(expect, xjson_get_string(&v), xjson_get_string_length(&v));\
+                xjson_free(&v);\
+        } while(0)
+
+static void test_parse_string() {
+        TEST_STRING("", "\"\"");
+        TEST_STRING("Hello", "\"Hello\"");
+}
+
 #define TEST_ERROR(error, json)\
         do {\
                 xjson_value v;\
+                xjson_init(&v);\
                 v.type = XJSON_FALSE;\
                 EXPECT_EQ_INT(error, xjson_parse(&v, json));\
                 EXPECT_EQ_INT(XJSON_NULL, xjson_get_type(&v));\
+                xjson_free(&v);\
         } while(0)
 
 static void test_parse_expect_value() {
@@ -141,16 +175,59 @@ static void test_parse_number_too_big() {
         TEST_ERROR(XJSON_PARSE_NUMBER_TOO_BIG, "-1e309");
 }
 
+static void test_access_null() {
+        xjson_value v;
+        xjson_init(&v);
+        xjson_set_string(&v, "a", 1);
+        xjson_set_null(&v);
+        EXPECT_EQ_INT(XJSON_NULL, xjson_get_type(&v));
+        xjson_free(&v);
+}
+
+static void test_access_boolean() {
+        xjson_value v;
+        xjson_init(&v);
+        xjson_set_boolean(&v, xjson_true);
+        EXPECT_TRUE(xjson_get_boolean(&v));
+        xjson_set_boolean(&v, xjson_false);
+        EXPECT_FALSE(xjson_get_boolean(&v));
+        xjson_free(&v);
+}
+
+static void test_access_number() {
+        xjson_value v;
+        xjson_init(&v);
+        xjson_set_number(&v, 3.1415926);
+        EXPECT_EQ_DOUBLE(3.1415926, xjson_get_number(&v));
+        xjson_free(&v);
+}
+
+static void test_access_string() {
+        xjson_value v;
+        xjson_init(&v);
+        xjson_set_string(&v, "", 0);
+        EXPECT_EQ_STRING("", xjson_get_string(&v), xjson_get_string_length(&v));
+        xjson_set_string(&v, "Hello", 5);
+        EXPECT_EQ_STRING("Hello", xjson_get_string(&v), xjson_get_string_length(&v));
+        xjson_free(&v);
+}
+
 static void test_parse() {
         test_parse_null();
         test_parse_true();
         test_parse_false();
         test_parse_number();
+        test_parse_string();
         
         test_parse_expect_value();
         test_parse_invalid_value();
         test_parse_root_not_singular();
         test_parse_number_too_big();
+
+        test_access_null();
+        test_access_boolean();
+        test_access_number();
+        test_access_string();
 }
 
 int main() {
