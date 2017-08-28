@@ -239,6 +239,8 @@ static int xjson_parse_string(xjson_context *c, xjson_value *v) {
         }
 }
 
+static int xjson_parse_array(xjson_context *c, xjson_value *v);
+
 /*---------------------------------------------------------------------------*
         函数名: xjson_parse_value
         描述:   json token解析函数
@@ -266,9 +268,85 @@ xjson_parse_value(xjson_context *c, xjson_value *v) {
                 case 'f':       return xjson_parse_literal(c, v, "false", XJSON_FALSE);
                 case 'n':       return xjson_parse_literal(c, v, "null", XJSON_NULL);
                 case '"':       return xjson_parse_string(c, v);
+                case '[':       return xjson_parse_array(c, v);
                 default:        return xjson_parse_number(c, v);
                 case '\0':      return XJSON_PARSE_EXPECT_VALUE;
         }
+}
+
+/*---------------------------------------------------------------------------*
+        函数名: xjson_parse_array
+        描述:   解析array类型
+
+        input:  c,              json会话
+                v,              json对象，用于存储json解析结果
+
+        output: v               json解析结果
+
+        return: success, XJSON_PARSE_OK
+                failure, XJSON_PARSE_INVALID_VALUE ||
+                         XJSON_PARSE_EXPECT_VALUE ||
+
+                         XJSON_PARSE_NUMBER_TOO_BIG ||
+
+                         XJSON_PARSE_INVALID_STRING_ESCAPE ||
+                         XJSON_PARSE_INVALID_STRING_CHAR ||
+                         XJSON_PARSE_MISS_QUOTATION_MARK ||
+
+                         XJSON_PARSE_MISS_COMMA_OR_SQUARE_BRACKET
+ *---------------------------------------------------------------------------*/
+static int
+xjson_parse_array(xjson_context *c, xjson_value *v) {
+        EXPECT(c, '[');
+
+        size_t size = 0;
+        int ret;
+        xjson_parse_whitespace(c);
+        if(*c->json == ']') {
+                c->json++;
+                v->type = XJSON_ARRAY;
+                v->u.a.size = 0;
+                v->u.a.e = NULL;
+
+                return XJSON_PARSE_OK;
+        }
+
+        for (;;) {
+                xjson_value e;
+                xjson_init(&e);
+
+                if ((ret = xjson_parse_value(c, &e)) != XJSON_PARSE_OK) {
+                        break;
+                }
+
+                memcpy(xjson_context_push(c, sizeof(xjson_value)), &e, sizeof(xjson_value));
+                size++;
+
+                xjson_parse_whitespace(c);
+                if (*c->json == ',') {
+                        c->json++;
+                        xjson_parse_whitespace(c);
+
+                } else if (*c->json == ']') {
+                        c->json++;
+                        v->type = XJSON_ARRAY;
+                        v->u.a.size = size;
+                        size *= sizeof(xjson_value);
+
+                        memcpy(v->u.a.e = (xjson_value *)malloc(size), xjson_context_pop(c, size), size);
+                        return XJSON_PARSE_OK;
+
+                } else {
+                        ret =  XJSON_PARSE_MISS_COMMA_OR_SQUARE_BRACKET;
+                        break;
+                }
+        }
+
+        for (int i = 0; i < size; i++) {
+                xjson_free((xjson_value*)xjson_context_pop(c, sizeof(xjson_value)));
+        }
+
+        return ret;
 }
 
 /*---------------------------------------------------------------------------*
@@ -319,7 +397,7 @@ xjson_parse(xjson_value *v, const char *json) {
 
 /*---------------------------------------------------------------------------*
         函数名: xjson_free
-        描述:   释放
+        描述:   释放(xjson_value *)(v)->u.s.string
 
         input:  v,              json对象
 
@@ -439,7 +517,7 @@ xjson_set_number(xjson_value *v, double number) {
 
         output: None
 
-        return: success, 字符串
+        return: success, 返回字符串
                 failure, 程序终止
  *---------------------------------------------------------------------------*/
 const char *
@@ -489,4 +567,39 @@ xjson_set_string(
         v->u.s.string[length] = '\0';
         v->u.s.length = length;
         v->type = XJSON_STRING;
+}
+
+/*---------------------------------------------------------------------------*
+        函数名: xjson_get_array_size
+        描述:   获取json array对象的长度
+
+        input:  v,              json对象
+
+        output: None
+
+        return: success, 返回json array对象的长度
+                failure, 程序终止
+ *---------------------------------------------------------------------------*/
+size_t xjson_get_array_size(const xjson_value *v) {
+        assert(v != NULL && v->type == XJSON_ARRAY);
+        return v->u.a.size;
+}
+
+/*---------------------------------------------------------------------------*
+        函数名: xjson_get_array_element
+        描述:   根据index，获取json array对象的成员
+
+        input:  v,              json对象
+                index,          索引
+
+        output: None
+
+        return: success, 返回json array对象的成员
+                failure, 程序终止
+ *---------------------------------------------------------------------------*/
+xjson_value *xjson_get_array_element(const xjson_value *v, size_t index) {
+        assert(v != NULL && v->type == XJSON_ARRAY);
+        assert(index < v->u.a.size);
+
+        return &v->u.a.e[index];
 }

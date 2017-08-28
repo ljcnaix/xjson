@@ -35,6 +35,12 @@ static int test_pass = 0;
 #define EXPECT_TRUE(actual) EXPECT_EQ_BASE((actual) != 0, "true", "false", "%s")
 #define EXPECT_FALSE(actual) EXPECT_EQ_BASE((actual) == 0, "false", "true", "%s")
 
+#define EXPECT_EQ_SIZE_T(expect, actual)\
+        EXPECT_EQ_BASE((expect) == (actual),\
+                        (size_t)expect,\
+                        (size_t)actual,\
+                        "%zu")
+
 static void test_parse_null() {
         xjson_value v;
         xjson_init(&v);
@@ -137,6 +143,17 @@ static void test_parse_string() {
         TEST_STRING("\" \\ / \b \f \n \r \t", "\"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\"");
 }
 
+static void test_parse_array() {
+        xjson_value v;
+        xjson_init(&v);
+
+        EXPECT_EQ_INT(XJSON_PARSE_OK, xjson_parse(&v, "[ ]"));
+        EXPECT_EQ_INT(XJSON_ARRAY, xjson_get_type(&v));
+        EXPECT_EQ_SIZE_T(0, xjson_get_array_size(&v));
+
+        xjson_free(&v);
+}
+
 #define TEST_ERROR(error, json)\
         do {\
                 xjson_value v;\
@@ -166,10 +183,19 @@ static void test_parse_invalid_value() {
         TEST_ERROR(XJSON_PARSE_INVALID_VALUE, "inf"); 
         TEST_ERROR(XJSON_PARSE_INVALID_VALUE, "NAN"); 
         TEST_ERROR(XJSON_PARSE_INVALID_VALUE, "nan"); 
+
+        /* invalid array value */
+        TEST_ERROR(XJSON_PARSE_INVALID_VALUE, "[1,]");
+        TEST_ERROR(XJSON_PARSE_INVALID_VALUE, "[\"a\", nul]");
 }
 
 static void test_parse_root_not_singular() {
         TEST_ERROR(XJSON_PARSE_ROOT_NOT_SINGULAR, "null x"); 
+
+        /* invalid number */
+        TEST_ERROR(XJSON_PARSE_ROOT_NOT_SINGULAR, "0123"); 
+        TEST_ERROR(XJSON_PARSE_ROOT_NOT_SINGULAR, "0x0"); 
+        TEST_ERROR(XJSON_PARSE_ROOT_NOT_SINGULAR, "0x123"); 
 }
 
 static void test_parse_number_too_big() {
@@ -192,6 +218,31 @@ static void test_parse_invalid_string_escape() {
 static void test_parse_invalid_string_char() {
         TEST_ERROR(XJSON_PARSE_INVALID_STRING_CHAR, "\"\x01\"");
         TEST_ERROR(XJSON_PARSE_INVALID_STRING_CHAR, "\"\x1F\"");
+}
+
+static void test_parse_miss_comma_or_square_bracket() {
+        TEST_ERROR(XJSON_PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[1");
+        TEST_ERROR(XJSON_PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[1}");
+        TEST_ERROR(XJSON_PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[1 2");
+        TEST_ERROR(XJSON_PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[[]");
+}
+
+static void test_parse() {
+        test_parse_null();
+        test_parse_true();
+        test_parse_false();
+        test_parse_number();
+        test_parse_string();
+        test_parse_array();
+        
+        test_parse_expect_value();
+        test_parse_invalid_value();
+        test_parse_root_not_singular();
+        test_parse_number_too_big();
+        test_parse_missing_quotation_mark();
+        test_parse_invalid_string_escape();
+        test_parse_invalid_string_char();
+        test_parse_miss_comma_or_square_bracket();
 }
 
 static void test_access_null() {
@@ -231,21 +282,7 @@ static void test_access_string() {
         xjson_free(&v);
 }
 
-static void test_parse() {
-        test_parse_null();
-        test_parse_true();
-        test_parse_false();
-        test_parse_number();
-        test_parse_string();
-        
-        test_parse_expect_value();
-        test_parse_invalid_value();
-        test_parse_root_not_singular();
-        test_parse_number_too_big();
-        test_parse_missing_quotation_mark();
-        test_parse_invalid_string_escape();
-        test_parse_invalid_string_char();
-
+static void test_access() {
         test_access_null();
         test_access_boolean();
         test_access_number();
@@ -254,6 +291,8 @@ static void test_parse() {
 
 int main() {
         test_parse();
+        test_access();
+
         printf("%d/%d (%3.2f%%) passed\n",\
                         test_pass,\
                         test_count,
