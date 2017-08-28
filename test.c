@@ -33,7 +33,7 @@ static int test_pass = 0;
                         expect, actual, "%s")
 
 #define EXPECT_TRUE(actual) EXPECT_EQ_BASE((actual) != 0, "true", "false", "%s")
-#define EXPECT_TRUE(actual) EXPECT_EQ_BASE((actual) == 0, "false", "true", "%s")
+#define EXPECT_FALSE(actual) EXPECT_EQ_BASE((actual) == 0, "false", "true", "%s")
 
 static void test_parse_null() {
         xjson_value v;
@@ -133,6 +133,8 @@ static void test_parse_number() {
 static void test_parse_string() {
         TEST_STRING("", "\"\"");
         TEST_STRING("Hello", "\"Hello\"");
+        TEST_STRING("Hello\nWorld", "\"Hello\\nWorld\"");
+        TEST_STRING("\" \\ / \b \f \n \r \t", "\"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\"");
 }
 
 #define TEST_ERROR(error, json)\
@@ -173,6 +175,23 @@ static void test_parse_root_not_singular() {
 static void test_parse_number_too_big() {
         TEST_ERROR(XJSON_PARSE_NUMBER_TOO_BIG, "1e309");
         TEST_ERROR(XJSON_PARSE_NUMBER_TOO_BIG, "-1e309");
+}
+
+static void test_parse_missing_quotation_mark() {
+        TEST_ERROR(XJSON_PARSE_MISS_QUOTATION_MARK, "\"");
+        TEST_ERROR(XJSON_PARSE_MISS_QUOTATION_MARK, "\"abc");
+}
+
+static void test_parse_invalid_string_escape() {
+        TEST_ERROR(XJSON_PARSE_INVALID_STRING_ESCAPE, "\"\\v\"");
+        TEST_ERROR(XJSON_PARSE_INVALID_STRING_ESCAPE, "\"\\'\"");
+        TEST_ERROR(XJSON_PARSE_INVALID_STRING_ESCAPE, "\"\\0\"");
+        TEST_ERROR(XJSON_PARSE_INVALID_STRING_ESCAPE, "\"\\x12\"");
+}
+
+static void test_parse_invalid_string_char() {
+        TEST_ERROR(XJSON_PARSE_INVALID_STRING_CHAR, "\"\x01\"");
+        TEST_ERROR(XJSON_PARSE_INVALID_STRING_CHAR, "\"\x1F\"");
 }
 
 static void test_access_null() {
@@ -223,6 +242,9 @@ static void test_parse() {
         test_parse_invalid_value();
         test_parse_root_not_singular();
         test_parse_number_too_big();
+        test_parse_missing_quotation_mark();
+        test_parse_invalid_string_escape();
+        test_parse_invalid_string_char();
 
         test_access_null();
         test_access_boolean();

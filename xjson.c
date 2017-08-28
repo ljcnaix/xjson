@@ -189,12 +189,14 @@ xjson_parse_number(xjson_context *c, xjson_value *v) {
         input:  c,              json会话
                 v,              json对象，用于存储json解析结果
 
-        output: v.type          json解析结果, 应为XJSON_NUMBER
-                v.number        json解析结果，存储双精度浮点型数值
+        output: v.type          json解析结果, 应为XJSON_STRING
+                v.u.s.string    json解析结果，存储字符串
+                v.u.s.length    json解析结果，存储字符串长度
 
         return: success, XJSON_PARSE_OK
-                failure, XJSON_PARSE_INVALID_VALUE ||
-                         XJSON_PARSE_NUMBER_TOO_BIG
+                failure, XJSON_PARSE_INVALID_STRING_ESCAPE ||
+                         XJSON_PARSE_INVALID_STRING_CHAR ||
+                         XJSON_PARSE_MISS_QUOTATION_MARK
  *---------------------------------------------------------------------------*/
 static int xjson_parse_string(xjson_context *c, xjson_value *v) {
         EXPECT(c, '\"');
@@ -244,11 +246,17 @@ static int xjson_parse_string(xjson_context *c, xjson_value *v) {
         input:  c,              json会话
                 v,              json对象，用于存储json解析结果
 
-        output: v               json解析结果, 应为XJSON_NUMBER
+        output: v               json解析结果
 
         return: success, XJSON_PARSE_OK
                 failure, XJSON_PARSE_INVALID_VALUE ||
-                         XJSON_PARSE_NUMBER_TOO_BIG
+                         XJSON_PARSE_EXPECT_VALUE ||
+
+                         XJSON_PARSE_NUMBER_TOO_BIG ||
+
+                         XJSON_PARSE_INVALID_STRING_ESCAPE ||
+                         XJSON_PARSE_INVALID_STRING_CHAR ||
+                         XJSON_PARSE_MISS_QUOTATION_MARK
  *---------------------------------------------------------------------------*/
 static int
 xjson_parse_value(xjson_context *c, xjson_value *v) {
@@ -267,14 +275,21 @@ xjson_parse_value(xjson_context *c, xjson_value *v) {
         函数名: xjson_parse
         描述:   json字符串解析函数
 
-        input:  c,              json会话
-                v,              json对象，用于存储json解析结果
+        input:  v,              json对象，用于存储json解析结果
+                json,           json字符串
 
-        output: v               json解析结果, 应为XJSON_NUMBER
+        output: v               json解析结果
 
         return: success, XJSON_PARSE_OK
                 failure, XJSON_PARSE_INVALID_VALUE ||
-                         XJSON_PARSE_NUMBER_TOO_BIG
+                         XJSON_PARSE_EXPECT_VALUE ||
+                         XJSON_PARSE_ROOT_NOT_SINGULAR || 
+
+                         XJSON_PARSE_NUMBER_TOO_BIG ||
+
+                         XJSON_PARSE_INVALID_STRING_ESCAPE ||
+                         XJSON_PARSE_INVALID_STRING_CHAR ||
+                         XJSON_PARSE_MISS_QUOTATION_MARK
  *---------------------------------------------------------------------------*/
 int
 xjson_parse(xjson_value *v, const char *json) {
@@ -285,7 +300,7 @@ xjson_parse(xjson_value *v, const char *json) {
         c.stack = NULL;
         c.size = c.top = 0;
 
-        xjson_init(&v);
+        xjson_init(v);
         xjson_parse_whitespace(&c);
         int ret = xjson_parse_value(&c, v);
         if (ret == XJSON_PARSE_OK) {
